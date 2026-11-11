@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+db.sqlite3
+staticfiles/
+.DS_Store
+node_modules/
+frontend/dist/
+client_secret*.json

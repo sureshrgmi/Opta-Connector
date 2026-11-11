@@ -1,0 +1,23 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7fb">
+    <title>{% if request.resolver_match.url_name == "postgres_check" %}Postgres check · {% endif %}Opta Connector</title>
+    <link rel="stylesheet" href="{% static 'frontend/app.css' %}">
+  </head>
+  <body>
+    <div
+      id="root"
+      data-user-name="{{ request.user.get_full_name|default:request.user.email }}"
+      data-user-email="{{ request.user.email }}"
+      data-user-initial="{{ request.user.first_name|default:request.user.email|first|upper }}"
+    ></div>
+    <form id="logout-form" method="post" action="{% url 'account_logout' %}" hidden>
+      {% csrf_token %}
+    </form>
+    <script type="module" src="{% static 'frontend/app.js' %}"></script>
+  </body>
+</html>
