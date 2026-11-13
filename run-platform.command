@@ -125,5 +125,5 @@ else
   open "$APP_URL"
 fi
 
-printf 'Opta Connector is running. Press Ctrl+C to stop Django; PostgreSQL will remain running.\n'
+printf 'TechnicalArea is running. Press Ctrl+C to stop Django; PostgreSQL will remain running.\n'
 wait "$DJANGO_PID"

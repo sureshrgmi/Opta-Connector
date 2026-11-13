@@ -18,6 +18,7 @@ from .models import (
     Event,
     Match,
     MatchPlayer,
+    PipelineSettings,
     Player,
     Season,
     SyncRun,
@@ -28,30 +29,36 @@ logger = logging.getLogger(__name__)
 
 OPEN_DATA_ROOT = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 PREMIER_LEAGUE_ID = 2
-MAX_WORKERS = 8
-HTTP_TIMEOUT_SECONDS = 30
 SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 
-def fetch_json(path):
+def fetch_json(path, *, allow_missing=False):
+    pipeline_settings = PipelineSettings.current()
+    request_timeout = pipeline_settings.request_timeout_seconds
+    request_retries = pipeline_settings.request_retries
+    if allow_missing:
+        request_timeout = min(request_timeout, 15)
+        request_retries = min(request_retries, 2)
     request = Request(
         f"{OPEN_DATA_ROOT}/{path}",
-        headers={"User-Agent": "OptaConnector/1.0", "Accept": "application/json"},
+        headers={"User-Agent": "TechnicalArea/1.0", "Accept": "application/json"},
     )
     last_error = None
-    for attempt in range(3):
+    for attempt in range(request_retries):
         try:
             with urlopen(
                 request,
-                timeout=HTTP_TIMEOUT_SECONDS,
+                timeout=request_timeout,
                 context=SSL_CONTEXT,
             ) as response:
                 return json.load(response)
         except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as error:
+            if isinstance(error, HTTPError) and error.code == 404 and allow_missing:
+                return None
             last_error = error
             if isinstance(error, HTTPError) and error.code == 404:
                 break
-            if attempt < 2:
+            if attempt + 1 < request_retries:
                 time.sleep(attempt + 1)
     raise RuntimeError(f"Unable to read StatsBomb Open Data file {path}: {last_error}")
 
@@ -251,6 +258,9 @@ def sync_premier_league(run_id):
     failures = []
     summary = {"matches_updated": 0, "matches_unchanged": 0, "matches_failed": 0}
     try:
+        pipeline_settings = PipelineSettings.current()
+        if not pipeline_settings.sync_enabled:
+            raise RuntimeError("StatsBomb syncing is disabled in Admin → Data Pipeline.")
         competition_rows = fetch_json("competitions.json")
         seasons = [
             row for row in competition_rows if row["competition_id"] == PREMIER_LEAGUE_ID
@@ -283,7 +293,7 @@ def sync_premier_league(run_id):
             )
             season_matches.extend((match_data, season) for match_data in matches)
 
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        with ThreadPoolExecutor(max_workers=pipeline_settings.max_workers) as executor:
             futures = {
                 executor.submit(_import_match, match_data, season): match_data["match_id"]
                 for match_data, season in season_matches
@@ -340,6 +350,8 @@ def sync_premier_league(run_id):
 
 
 def start_premier_league_sync():
+    if not PipelineSettings.current().sync_enabled:
+        raise RuntimeError("StatsBomb syncing is disabled in Admin → Data Pipeline.")
     active = SyncRun.objects.filter(is_active=True).first()
     if active:
         return active, False

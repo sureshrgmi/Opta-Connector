@@ -1,4 +1,6 @@
 from django.db import models
+from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 
 class Competition(models.Model):
@@ -120,6 +122,19 @@ class Event(models.Model):
         ]
 
 
+class Match360Data(models.Model):
+    match = models.OneToOneField(
+        Match, related_name="statsbomb_360", on_delete=models.CASCADE
+    )
+    available = models.BooleanField(default=True)
+    frames = models.JSONField(default=list)
+    checked_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "StatsBomb 360 match data"
+        verbose_name_plural = "StatsBomb 360 match data"
+
+
 class SyncRun(models.Model):
     class Status(models.TextChoices):
         QUEUED = "queued", "Queued"
@@ -145,3 +160,43 @@ class SyncRun(models.Model):
                 name="one_active_statsbomb_sync",
             )
         ]
+
+
+class UserAccessProfile(models.Model):
+    class Role(models.TextChoices):
+        ANALYST = "analyst", "Analyst"
+        ADMIN = "admin", "Admin"
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        related_name="access_profile",
+        on_delete=models.CASCADE,
+    )
+    role = models.CharField(max_length=16, choices=Role.choices, default=Role.ANALYST)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user} ({self.get_role_display()})"
+
+
+class PipelineSettings(models.Model):
+    sync_enabled = models.BooleanField(default=True)
+    max_workers = models.PositiveSmallIntegerField(
+        default=8, validators=[MinValueValidator(1), MaxValueValidator(16)]
+    )
+    request_timeout_seconds = models.PositiveSmallIntegerField(
+        default=30, validators=[MinValueValidator(5), MaxValueValidator(120)]
+    )
+    request_retries = models.PositiveSmallIntegerField(
+        default=3, validators=[MinValueValidator(1), MaxValueValidator(10)]
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Pipeline settings"
+        verbose_name_plural = "Pipeline settings"
+
+    @classmethod
+    def current(cls):
+        settings, _ = cls.objects.get_or_create(pk=1)
+        return settings

@@ -4,8 +4,9 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f5f7fb">
-    <title>{% if request.resolver_match.url_name == "postgres_check" %}Postgres check · {% endif %}Opta Connector</title>
+    <meta name="theme-color" content="#f3f6f9">
+    <link rel="icon" type="image/svg+xml" href="{% static 'technical-area-logo.svg' %}">
+    <title>{% if request.resolver_match.url_name == "postgres_check" %}Postgres check · {% endif %}TechnicalArea</title>
     <link rel="stylesheet" href="{% static 'frontend/app.css' %}">
   </head>
   <body>
@@ -14,6 +15,8 @@
       data-user-name="{{ request.user.get_full_name|default:request.user.email }}"
       data-user-email="{{ request.user.email }}"
       data-user-initial="{{ request.user.first_name|default:request.user.email|first|upper }}"
+      data-user-role="{% if request.user.is_superuser %}admin{% else %}{{ request.user.access_profile.role }}{% endif %}"
+      data-is-admin="{% if request.user.is_superuser or request.user.access_profile.role == 'admin' %}true{% else %}false{% endif %}"
     ></div>
     <form id="logout-form" method="post" action="{% url 'account_logout' %}" hidden>
       {% csrf_token %}
